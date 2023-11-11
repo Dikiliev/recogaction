@@ -16,10 +16,11 @@ import torch.nn as nn
 from pytorchvideo.data.labeled_video_paths import LabeledVideoPaths
 
 import calculate_time
+import loader
 
 # Путь к тестовым данным
-test_dataset_path = Path('test/videos')
-test_classes_file = Path('test/classes.csv')
+test_dataset_path = Path('videos')
+test_classes_file = Path('classes.csv')
 
 # Загрузка меток классов
 class_names = pd.read_csv(test_classes_file, header=None)
@@ -48,6 +49,9 @@ test_dataset = LabeledVideoDataset(
 
 # DataLoader для тестового датасета
 test_dataloader = DataLoader(test_dataset, batch_size=4, shuffle=False)
+
+# Загрузка модели с Google Disk если локально его не существует
+loader.get_state_model()
 
 model = r3d_18(pretrained=False)  # Создаем модель с той же архитектурой
 model.fc = nn.Linear(model.fc.in_features, num_classes)  # Изменяем последний слой

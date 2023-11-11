@@ -17,8 +17,8 @@ import pandas as pd
 
 import calculate_time
 
-dataset_path = Path('train/videos')
-classes_file = Path('train/classes.csv')
+dataset_path = Path('videos')
+classes_file = Path('classes.csv')
 
 # Загрузка меток классов
 class_names = pd.read_csv(classes_file, header=None)
