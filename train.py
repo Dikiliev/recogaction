@@ -56,7 +56,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.CrossEntropyLoss()
 
 # Включение CUDA ядер
-device = torch.device("cuda")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
 print(device.type)
