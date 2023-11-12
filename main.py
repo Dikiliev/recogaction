@@ -24,6 +24,13 @@ test_classes_file = Path('classes.csv')
 
 # Загрузка меток классов
 class_names = pd.read_csv(test_classes_file, header=None)
+
+classes = []
+for i in range(len(class_names.get(0))):
+    if i == 0:
+        continue
+    classes.append([i - 1, class_names.get(1)[i]])
+
 num_classes = len(class_names)
 
 # Создание датасета для тестирования
@@ -55,13 +62,15 @@ loader.get_state_model()
 
 model = r3d_18(pretrained=False)  # Создаем модель с той же архитектурой
 model.fc = nn.Linear(model.fc.in_features, num_classes)  # Изменяем последний слой
-model.load_state_dict(torch.load('model_state_dict.pth'))  # Загружаем веса
+model.load_state_dict(torch.load('out_models/best_model_epoch_115.pth'))  # Загружаем веса
 model.eval()  # Переключаем модель в режим оценки
 
 
 # Включение CUDA ядер
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
+
+print(device)
 
 # Тестирование
 correct = 0
@@ -76,10 +85,13 @@ with torch.no_grad():
         outputs = model(inputs)
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
+
         correct += (predicted == labels).sum().item()
 
+        for i in range(labels.size(0)):
+            print(classes[predicted[i]])
 
-print(f'Accuracy of the network on the test videos: {100 * correct / total}%')
+print(f'Accuracy: {100 * correct / total}%')
 
 time_calculator.end()
 print(time_calculator.get_passed_time())

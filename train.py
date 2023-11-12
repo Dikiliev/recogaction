@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision.models.video import r3d_18
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision.transforms import Compose, Resize, CenterCrop
 from pytorchvideo.data.encoded_video import EncodedVideo
 from pytorchvideo.transforms import (
@@ -15,6 +15,7 @@ from pytorchvideo.data.labeled_video_paths import LabeledVideoPaths
 from pathlib import Path
 import pandas as pd
 
+from dataset import CustomLabeledVideoDataset
 import calculate_time
 
 dataset_path = Path('videos')
@@ -28,14 +29,15 @@ num_classes = len(class_names)
 labeled_video_paths = LabeledVideoPaths.from_path(dataset_path)
 clip_sampler = RandomClipSampler(clip_duration=2.0)
 
-# Преоброзования
+# Преобразования
 video_transform = Compose([
     UniformTemporalSubsample(8),
     ShortSideScale(size=256),
     CenterCrop(224),
 ])
 
-dataset = LabeledVideoDataset(
+
+dataset = CustomLabeledVideoDataset(
     labeled_video_paths,
     clip_sampler,
     decode_audio=False,
@@ -45,11 +47,17 @@ dataset = LabeledVideoDataset(
     ),
 )
 
-# DataLoader
-dataloader = DataLoader(dataset, batch_size=4, shuffle=False)
+# Разделение датасета на обучающую и валидационную выборки
+train_size = int(0.8 * len(dataset))
+val_size = len(dataset) - train_size
+train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-model = r3d_18(pretrained=True)  # Загрузка предобученной модели
-model.fc = nn.Linear(model.fc.in_features, num_classes)  # Замена последнего слоя
+# DataLoader для обучающего и валидационного наборов
+train_loader = DataLoader(train_dataset.dataset, batch_size=4, shuffle=False)
+val_loader = DataLoader(val_dataset.dataset, batch_size=4, shuffle=False)
+
+model = r3d_18(pretrained=True)
+model.fc = nn.Linear(model.fc.in_features, num_classes)
 
 # Определение оптимизатора и функции потерь
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -61,27 +69,44 @@ model = model.to(device)
 
 print(device.type)
 
-# Обучение
-num_epochs = 10
+# Обучение и валидация
+num_epochs = 500
 time_calculator = calculate_time.TimeCalculator()
 time_calculator.start()
 
-for epoch in range(num_epochs):
-    for data in dataloader:
-        inputs, labels = data['video'].to(device), data['label'].to(device)
+best_val_loss = float('inf')
 
+for epoch in range(num_epochs):
+    # Обучение
+    model.train()
+    for data in train_loader:
+        inputs, labels = data['video'].to(device), data['label'].to(device)
         optimizer.zero_grad()
         outputs = model(inputs)
         loss = criterion(outputs, labels)
-
-        # Обратный проход и оптимизация
         loss.backward()
         optimizer.step()
 
-    print(f'Epoch {epoch + 1}/{num_epochs}, Loss: {loss.item()}')
+    # Валидация
+    model.eval()
+    val_loss = 0
+    with torch.no_grad():
+        for data in val_loader:
+            inputs, labels = data['video'].to(device), data['label'].to(device)
+            outputs = model(inputs)
+            val_loss += criterion(outputs, labels).item()
+
+    # Средняя потеря и точность на валидационном наборе
+    avg_val_loss = val_loss / len(val_loader)
+    print(f'Epoch {epoch + 1}/{num_epochs}, Training Loss: {loss.item()}, Validation Loss: {avg_val_loss}')
+
+    if avg_val_loss < best_val_loss:
+        print(f'Saving new best model at epoch {epoch + 1} with validation loss: {avg_val_loss:.4f}')
+        best_val_loss = avg_val_loss
+        best_model_path = f'out_models/best_model_epoch_{epoch}.pth'
+        torch.save(model.state_dict(), best_model_path)
 
 time_calculator.end()
 print(time_calculator.get_passed_time())
 
 torch.save(model.state_dict(), 'model_state_dict.pth')
-
