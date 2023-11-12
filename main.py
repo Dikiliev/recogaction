@@ -62,7 +62,7 @@ loader.get_state_model()
 
 model = r3d_18(pretrained=False)  # Создаем модель с той же архитектурой
 model.fc = nn.Linear(model.fc.in_features, num_classes)  # Изменяем последний слой
-model.load_state_dict(torch.load('out_models/best_model_epoch_115.pth'))  # Загружаем веса
+model.load_state_dict(torch.load('model_state_dict.pth'))  # Загружаем веса
 model.eval()  # Переключаем модель в режим оценки
 
 
@@ -79,6 +79,11 @@ total = 0
 time_calculator = calculate_time.TimeCalculator()
 time_calculator.start()
 
+result = {
+    'video_name': [],
+    'action_id': []
+}
+
 with torch.no_grad():
     for data in test_dataloader:
         inputs, labels = data['video'].to(device), data['label'].to(device)
@@ -88,8 +93,8 @@ with torch.no_grad():
 
         correct += (predicted == labels).sum().item()
 
-        for i in range(labels.size(0)):
-            print(classes[predicted[i]])
+        # for i in range(labels.size(0)):
+        #     print(classes[predicted[i]])
 
 print(f'Accuracy: {100 * correct / total}%')
 

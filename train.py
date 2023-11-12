@@ -15,11 +15,12 @@ from pytorchvideo.data.labeled_video_paths import LabeledVideoPaths
 from pathlib import Path
 import pandas as pd
 
+import config
 from dataset import CustomLabeledVideoDataset
 import calculate_time
 
-dataset_path = Path('videos')
-classes_file = Path('classes.csv')
+dataset_path = config.dataset_path
+classes_file = config.classes_file
 
 # Загрузка меток классов
 class_names = pd.read_csv(classes_file, header=None)
